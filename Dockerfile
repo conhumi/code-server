@@ -27,15 +27,30 @@ RUN apt-get update && apt-get install -y \
 	dumb-init \
 	vim \
 	curl \
-	wget
+       wget \
+       docker.io
 
 RUN locale-gen en_US.UTF-8
 # We unfortunately cannot use update-locale because docker will not use the env variables
 # configured in /etc/default/locale so we need to set it manually.
 ENV LC_ALL=en_US.UTF-8
 
-RUN adduser --gecos '' --disabled-password coder && \
-	echo "coder ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/nopasswd
+RUN addgroup --gid 1000 coder && \
+    adduser --uid 1000 --ingroup coder --home /home/coder --shell /bin/bash --gecos '' --disabled-password coder && \
+    echo "coder ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/nopasswd
+
+# installing docker-compose
+RUN curl -L https://github.com/docker/compose/releases/download/1.24.1/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose && \
+    chmod +x /usr/local/bin/docker-compose
+
+# installing fixuid
+RUN USER=coder && \
+    GROUP=coder && \
+    curl -SsL https://github.com/boxboat/fixuid/releases/download/v0.4/fixuid-0.4-linux-amd64.tar.gz | tar -C /usr/local/bin -xzf - && \
+    chown root:root /usr/local/bin/fixuid && \
+    chmod 4755 /usr/local/bin/fixuid && \
+    mkdir -p /etc/fixuid && \
+    printf "user: $USER\ngroup: $GROUP\n" > /etc/fixuid/config.yml
 
 USER coder
 # We create first instead of just using WORKDIR as when WORKDIR creates, the user is root.
@@ -50,4 +65,6 @@ VOLUME [ "/home/coder/project" ]
 COPY --from=0 /src/packages/server/cli-linux-x64 /usr/local/bin/code-server
 EXPOSE 8443
 
-ENTRYPOINT ["dumb-init", "code-server"]
+ENTRYPOINT ["fixuid", "-q", "dumb-init"]
+CMD ["code-server"]
+
