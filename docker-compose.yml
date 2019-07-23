@@ -1,0 +1,19 @@
+version: "3"
+services:
+  code:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: code-server
+    hostname: code-server
+    restart: always
+    env_file: .env
+    ports:
+      - "${HOST_PORT}:8443"
+    volumes:
+      - ${PROJECT_DIR}:/home/coder/project
+      - ${DOCKER_SOCK_DIR}:/var/run/docker.sock
+      - .local:/home/coder/.local
+    user: "${UID}:${GID}"
+    command: code-server --no-auth --allow-http
+
